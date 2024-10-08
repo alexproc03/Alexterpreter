@@ -1,11 +1,11 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <unordered_map>
 using namespace std;
 
 unordered_map<string, string> s;
-
-static string varmap(string var, unordered_map<string, string> state) {
+static string varmap(string var, unordered_map<string,  string> state) {
     string val = state[var];
     if (val.length() == 0) {
         cout << var << " not found in state, ";
@@ -55,7 +55,10 @@ static void execute(string line) {
             cout << evaluate_expr(line) << endl;
         }
     }
-
+    else {
+        cout << "Statement not defined";
+        exit;
+    }
 }
 
 static void interpret(string filepath) {
