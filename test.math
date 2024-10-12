@@ -1,2 +1,2 @@
-let b = 5
-b + 4
+print("skibidi")
+print(true && false)
