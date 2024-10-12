@@ -31,15 +31,6 @@ public:
 
 unordered_map<string, Var> s;
 
-static Var varmap(string var_name, unordered_map<string,  Var> state) {
-    Var var = state[var_name];
-    string val = var.getVal();
-    if (val.length() == 0) {
-        cout << var_name << " not found in state, ";
-    }
-    return var;
-}
-
 static bool contains(list<string> list, string target) {
     return (find(list.begin(), list.end(), target) != list.end());
 }
@@ -51,6 +42,17 @@ static bool is_in_state(string var_name, unordered_map<string, Var> state) {
     else {
         return true;
     }
+}
+
+static Var varmap(string var_name, unordered_map<string,  Var> state) {
+    if (is_in_state(var_name, state)) {
+        
+        Var var = state[var_name];
+        return var;
+    }
+    else {
+        throw runtime_error("\"" + var_name + "\" not defined");
+    }    
 }
 
 static string remove_whitespace(string str) {
@@ -118,8 +120,8 @@ static int MDEC(string number) {
 
 static list<string> parse_expr(string expr) {
     list<string> tokens;
-    string operators = "+-*/%()<>!";
-    string multi_operators[] = {"&&", "||", "==", "<=", ">="};
+    string operators = "+-*/%()<>";
+    string multi_operators[] = {"&&", "||", "==", "<=", ">=", "!="};
     expr = remove_whitespace(expr);
     //parse expression into tokens
     int index = 0;
@@ -148,10 +150,10 @@ static list<string> parse_expr(string expr) {
             //TODO: Something here because this is an error I think
             index++;
         }
-        for (string i : tokens) {
-            cout << i << ", ";
-        }
-        cout << endl;
+        // for (string i : tokens) {
+        //     cout << i << ", ";
+        // }
+        // cout << endl;
     }
     return tokens;
 }
@@ -174,29 +176,44 @@ static string determine_type(string value) {
     }
 }
 
-//Helper for evaluate_expr
+static string determine_type(list<string> tokens) {
+    // initial guess based on first token
+    string initial_guess = determine_type(tokens.front());
+    // automatically determines return type to be bool in the case that a bool operator exists
+    for (string token : tokens) {
+        if (token == "&&" || token == "||" || token == ">=" || token == "<=" || token == "!=" || token == ">" || token == "<") {
+            return "bool";
+        }
+    }
+    return initial_guess;
+}
+
 static list<string> evaluate_parentheses(list<string> tokens) {
     //TODO: implement stack for dealing with parentheses, calling evaluate_expr on the insides of the parentheses
-        int startIndex = distance(tokens.begin(), find(tokens.begin(), tokens.end(), "("));
-        int endIndex = tokens.size() - distance(tokens.rbegin(), find(tokens.rbegin(), tokens.rend(), ")")) - 1;
-        cout << startIndex << ", " << endIndex << endl;
+        // int startIndex = distance(tokens.begin(), find(tokens.begin(), tokens.end(), "("));
+        // int endIndex = tokens.size() - distance(tokens.rbegin(), find(tokens.rbegin(), tokens.rend(), ")")) - 1;
+        // cout << startIndex << ", " << endIndex << endl;
         
-        auto it = tokens.begin();
-        advance(it, startIndex);
-        for (int i = startIndex; i <= endIndex; i++) {
-                string elemnt = *it;
-                it = tokens.erase(it);
-        }
-        for (string i : tokens) {
-            cout << i << ", ";
-        }
-        cout << endl;
+        // auto it = tokens.begin();
+        // advance(it, startIndex);
+        // for (int i = startIndex; i <= endIndex; i++) {
+        //         string elemnt = *it;
+        //         it = tokens.erase(it);
+        // }
+        // for (string i : tokens) {
+        //     cout << i << ", ";
+        // }
+        // cout << endl;
     return tokens;
 }
 
 static string evaluate_expr(list<string> tokens) {
-    // return type is based on the type of the first identifier
-    string return_type = determine_type(tokens.front());
+    // determine return type
+    string return_type = determine_type(tokens);
+    // for (string t: tokens) {
+    //     cout << t << ", ";
+    // }
+    // cout << endl;
     // base case, there is a single token
     if (tokens.size() == 1) {
         string token = tokens.front();
@@ -209,11 +226,11 @@ static string evaluate_expr(list<string> tokens) {
     }
     // evaluate parentheses using recursive helper function evaluate_parentheses
     if (contains(tokens, "(") || contains(tokens, ")")) {
-        evaluate_parentheses(tokens);
+        tokens = evaluate_parentheses(tokens);
     }
 
-    // // iterative case: evaluate operations in correct precedence
-    // if (return_type == "int") {
+    // iterative case: evaluate operations in correct precedence
+    if (return_type != "string") {
         auto it = tokens.begin();
         while (contains(tokens, "*") || contains(tokens, "/") || contains(tokens, "%")) {
             //Identify if current index is an operator
@@ -239,7 +256,7 @@ static string evaluate_expr(list<string> tokens) {
                 tokens.erase(prev(it));
                 tokens.erase(next(it));
             }
-            advance(it, 1);
+            std::advance(it, 1);
         }
         it = tokens.begin();
         while(contains(tokens, "+") || contains(tokens, "-")) {
@@ -261,17 +278,128 @@ static string evaluate_expr(list<string> tokens) {
             }
             advance(it, 1);
         }
+    }
+    if (return_type == "bool") {
+        auto it = tokens.begin();
+        while(contains(tokens, "<") || contains(tokens, "<=") || contains(tokens, ">") || contains(tokens, ">=")) {
+            //Identify if current index is an operator
+            string token = *it;
+            if (token == "<") {
+                int operand1 = MDEC(*prev(it));
+                int operand2 = MDEC(*next(it));
+                *it = (operand1 < operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            else if (token == "<=") {
+                int operand1 = MDEC(*prev(it));
+                int operand2 = MDEC(*next(it));
+                *it = (operand1 <= operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            else if (token == ">") {
+                int operand1 = MDEC(*prev(it));
+                int operand2 = MDEC(*next(it));
+                *it = (operand1 > operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            else if (token == ">=") {
+                int operand1 = MDEC(*prev(it));
+                int operand2 = MDEC(*next(it));
+                *it = (operand1 > operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            for (string t: tokens) {
+                cout << t << ", ";
+            }
+            cout << endl;
+            advance(it, 1);
+        }
+        it = tokens.begin();
+        while(contains(tokens, "==") || contains(tokens, "!=")) {
+            string token = *it;
+            if (token == "==") {
+                string operand1 = *prev(it);
+                string operand2 = *next(it);
+                string type1 = determine_type(operand1);
+                string type2 = determine_type(operand2);
+                *it = (type1 == type2 && operand1 == operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            else if (token == "!=") {
+                string operand1 = *prev(it);
+                string operand2 = *next(it);
+                string type1 = determine_type(operand1);
+                string type2 = determine_type(operand2);
+                *it = (operand1 != operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            advance(it, 1);
+        }
+        it = tokens.begin();
+        while(contains(tokens, "&&") || contains(tokens, "||")) {
+            string token = *it;
+            if (token == "&&") {
+                string operand1 = *prev(it);
+                string operand2 = *next(it);
+                bool bool_operand1, bool_operand2;
+                if ((operand1 != "true" && operand1 != "false") || (operand2 != "true" && operand2 != "false")) {
+                    throw runtime_error("invalid operands for operator");
+                }
+                else {
+                    bool_operand1 = (operand1 == "true") ? true : false;
+                    bool_operand2 = (operand2 == "true") ? true : false;
+                }
+                *it = (bool_operand1 && bool_operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            else if (token == "||") {
+                string operand1 = *prev(it);
+                string operand2 = *next(it);
+                bool bool_operand1, bool_operand2;
+                if ((operand1 != "true" && operand1 != "false") || (operand2 != "true" && operand2 != "false")) {
+                    throw runtime_error("invalid operands for operator");
+                }
+                else {
+                    bool_operand1 = (operand1 == "true") ? true : false;
+                    bool_operand2 = (operand2 == "true") ? true : false;
+                }
+                *it = (bool_operand1 || bool_operand2) ? "true" : "false";
+                tokens.erase(prev(it));
+                tokens.erase(next(it));
+            }
+            advance(it, 1);
+        }
+    }
+    if (return_type == "string") {
+        auto it = tokens.begin();
+        while(contains(tokens, "+")) {
+            string token = *it;
+            string operand1 = *prev(it);
+            string operand2 = *next(it);
+            *it = operand1 + operand2;
+            tokens.erase(prev(it));
+            tokens.erase(next(it));
+        }
+    }
+    if (tokens.size() == 1) {
         return tokens.front();
-    // }
-    // else if (return_type = "bool") {
-
-    // }
+    }
+    else {
+        throw runtime_error("expression does not evaluate to any valid value");
+    }
 }
 
 static string evaluate_expr(string expr) {
         // parse expression
         list<string> tokens = parse_expr(expr);
-        // determine if all tokens are valid
+        // TODO: determine if all tokens are valid
         for (string& token : tokens) {
             if (is_in_state(token, s)) {
                token = varmap(token, s).getVal();

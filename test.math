@@ -1,2 +1,2 @@
-print("skibidi")
-print(true && false)
+let x = 5
+print("hello " + "world")
