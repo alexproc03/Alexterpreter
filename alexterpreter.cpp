@@ -22,7 +22,6 @@ public:
         return value;
     }
     void setVal(string value) {
-        //TODO: type check
         this->value = value;
     }
     string getType() {
@@ -184,7 +183,6 @@ list<string> parse_expr(string expr) {
             expr = expr.substr(index+1,expr.length() - 1 - index);
             index = 0;
         }
-        // check if expression is just a boolean, is a variable in program state, or is a string TODO: this logic is lazy and wrong
         else if (expr == "true" || expr == "false" || is_in_state(expr, s) || is_number(expr)) {
             tokens.push_back(expr);
             expr = "";
@@ -432,8 +430,7 @@ Var evaluate_expr(list<string> tokens) {
         return Var(tokens.front(), return_type);
     }
     else {
-        // throw runtime_error("Invalid expression");
-        exit(99);
+        throw runtime_error("Invalid expression");
     }
 }
 
@@ -549,7 +546,7 @@ int execute(list<Line> lines, int currentLevel) {
 }
 
 int main(int argc, char *argv[]) {
-    string filepath = "fibonacci.alex";
+    string filepath = "goodbyeworld.alex";
     if (argc >= 2) {
         filepath = argv[1];
     }
