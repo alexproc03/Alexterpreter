@@ -22,7 +22,7 @@ public:
         return value;
     }
     void setVal(string value) {
-        //TODO: Implement type checking logic
+        //TODO: type check
         this->value = value;
     }
     string getType() {
@@ -78,9 +78,8 @@ Var varmap(string var_name, unordered_map<string,  Var> state) {
     }    
 }
 
-// strips input of all spaces and newlines
-string remove_whitespace(string str) {
-    str.erase(remove(str.begin(), str.end(), ' '), str.end());
+// strips input newlines
+string remove_endline(string str) {
     str.erase(std::remove(str.begin(), str.end(), '\n'), str.end());
     str.erase(std::remove(str.begin(), str.end(), '\r'), str.end());
     return str;
@@ -149,15 +148,26 @@ list<string> parse_expr(string expr) {
     list<string> tokens;
     string operators = "+-*/%()<>";
     list<string> multi_operators = {"&&", "||", "==", "<=", ">=", "!="};
-    expr = remove_whitespace(expr);
+    expr = remove_endline(expr);
     //parse expression into tokens
     int index = 0;
     while (expr.length() != 0) {
         if (index == expr.length()) {
-            throw runtime_error("invalid expression");
+            throw runtime_error("invalid expression syntax");
+        }
+        if (expr[0] == '\"') {
+            tokens.push_back("\"");
+            expr = expr.substr(index + 1);
+            tokens.push_back(expr.substr(0, expr.find("\"")));
+            tokens.push_back("\"");
+            expr = expr.substr(expr.find("\"") + 1);
+            index = 0;
+        }
+        else if (expr[index] == ' ') {
+            expr.erase(index, 1);
         }
         // check for two character long operators
-        if (contains(multi_operators, expr.substr(index, 2))){
+        else if (contains(multi_operators, expr.substr(index, 2))){
             if (index > 0) {
                 tokens.push_back(expr.substr(0, index));
             }
@@ -175,7 +185,7 @@ list<string> parse_expr(string expr) {
             index = 0;
         }
         // check if expression is just a boolean, is a variable in program state, or is a string TODO: this logic is lazy and wrong
-        else if (expr == "true" || expr == "false" || is_in_state(expr, s) || is_number(expr) || (expr.find('\"') == 0 && expr.rfind('\"') == expr.length()-1)) {
+        else if (expr == "true" || expr == "false" || is_in_state(expr, s) || is_number(expr)) {
             tokens.push_back(expr);
             expr = "";
         }
@@ -201,7 +211,7 @@ string determine_type(string value) {
         return "int";
     }
     // string
-    else if (value[0] == '"' && value[value.length()-1] == '"') {
+    else if (value == "\"") {
         return "string";
     }
     // invalid
@@ -222,45 +232,37 @@ string determine_type(list<string> tokens) {
     return initial_guess;
 }
 
-// works with evaluate_expression to recursively work through parentheses
-list<string> evaluate_parentheses(list<string> tokens) {
-    //TODO: implement stack for dealing with parentheses, calling evaluate_expr on the insides of the parentheses
-        // int startIndex = distance(tokens.begin(), find(tokens.begin(), tokens.end(), "("));
-        // int endIndex = tokens.size() - distance(tokens.rbegin(), find(tokens.rbegin(), tokens.rend(), ")")) - 1;
-        // cout << startIndex << ", " << endIndex << endl;
-        
-        // auto it = tokens.begin();
-        // advance(it, startIndex);
-        // for (int i = startIndex; i <= endIndex; i++) {
-        //         string elemnt = *it;
-        //         it = tokens.erase(it);
-        // }
-    return tokens;
-}
-
 // determines the value of a set of parsed tokens
-string evaluate_expr(list<string> tokens) {
-    //check if token is in varmap
-    for (string& token : tokens) {
-        if (is_in_state(token, s)) {
-            token = varmap(token, s).getVal();
-         }
-    }
+Var evaluate_expr(list<string> tokens) {
     // determine return type
     string return_type = determine_type(tokens);
+
+    auto it = tokens.begin();
+    while (it != tokens.end()) {
+        string token = *it;
+        if (is_in_state(token, s)) {
+            Var variable = varmap(token, s);
+            if (variable.getType() == "string") {
+                *it = variable.getVal();
+                // Insert quotation marks around the original token
+                it = tokens.insert(it, "\""); 
+                advance(it, 2);
+                it = tokens.insert(it, "\""); 
+                it--;  // Move back to the last inserted quote for the next iteration
+            } else {
+                *it = variable.getVal();
+            }
+        }
+        ++it;
+    }
     // base case, there is a single token
-    if (tokens.size() == 1) {
-        string token = tokens.front();
-        if (is_number(token) || token == "true" || token == "false") {
-            return token;
+    if (tokens.size() == 1) {        string token = tokens.front();
+        if (is_number(token) || token == "true" || token == "false" || is_in_state(token, s)) {
+            return Var(token, return_type);
         }
         else {
             runtime_error("\"" + token + "\" is not a valid identifier\n");
         }
-    }
-    // evaluate parentheses using recursive helper function evaluate_parentheses
-    if (contains(tokens, "(") || contains(tokens, ")")) {
-        tokens = evaluate_parentheses(tokens);
     }
     // iterative case: evaluate operations in correct precedence
     if (return_type != "string") {
@@ -401,30 +403,42 @@ string evaluate_expr(list<string> tokens) {
                 tokens.erase(prev(it));
                 tokens.erase(next(it));
             }
-            advance(it, 1);
+            it++;
         }
     }
     if (return_type == "string") {
         auto it = tokens.begin();
+        while (it != tokens.end()) {
+            if (*it == "\"") {
+                it = tokens.erase(it); // Erase returns the next iterator
+            } else {
+                ++it;
+            }
+        }
+        it = tokens.begin();
         while(contains(tokens, "+")) {
             string token = *it;
-            string operand1 = *prev(it);
-            string operand2 = *next(it);
-            *it = operand1 + operand2;
-            tokens.erase(prev(it));
-            tokens.erase(next(it));
+            if (token == "+") {
+                    string operand1 = *prev(it);
+                    string operand2 = *next(it);
+                    *it = operand1 + operand2;
+                    tokens.erase(prev(it));
+                    tokens.erase(next(it));
+                }
+            it++;
         }
     }
     if (tokens.size() == 1) {
-        return tokens.front();
+        return Var(tokens.front(), return_type);
     }
     else {
-        throw runtime_error("invalid expression");
+        // throw runtime_error("Invalid expression");
+        exit(99);
     }
 }
 
 // overloaded version of evaluate_expr which parses the expression first
-string evaluate_expr(string expr) {
+Var evaluate_expr(string expr) {
         // parse expression
         list<string> tokens = parse_expr(expr);
         // call sister-function
@@ -438,11 +452,11 @@ void execute(string contents) {
         contents = contents.substr(contents.find_first_not_of(" "));
         // assignment
         if (contents.length() >= 4 && contents.rfind("let ") == 0) {
-            contents = remove_whitespace(contents.substr(4));
+            contents = remove_endline(contents.substr(4));
             string var = contents.substr(0, contents.find("="));
+            var.erase(remove(var.begin(), var.end(), ' '), var.end());
             string expr = contents.substr(contents.find("=") + 1);
-            string val = evaluate_expr(expr);
-            s[var] = Var(val, determine_type(val));
+            s[var] = evaluate_expr(expr);
         }
         //print statements
         else if (contents.length() >= 7 && contents.rfind("println") == 0) {
@@ -450,13 +464,13 @@ void execute(string contents) {
             if (contents.empty()) {
                 cout << endl;
             }
-            else{
-                cout << evaluate_expr(contents) << endl;
+            else {
+                cout << evaluate_expr(contents).getVal() << endl;
             }    
         }
         else if (contents.length() >= 5 && contents.rfind("print") == 0) {
             contents = contents.substr(contents.rfind("(") + 1, contents.find(")") - contents.rfind("(")-1);
-            cout << evaluate_expr(contents);
+            cout << evaluate_expr(contents).getVal();
         }
         else {
             throw runtime_error("\"" + contents + "\" is not a valid or known statement\n");
@@ -490,7 +504,7 @@ int execute(list<Line> lines, int currentLevel) {
         // if statement
         if (contents.length() >= 2 && contents.rfind("if") == 0) {
             contents = contents.substr(contents.rfind("(") + 1, contents.find(")") - contents.rfind("(")-1);
-            if (evaluate_expr(contents) == "true") {
+            if (evaluate_expr(contents).getVal() == "true") {
                 list<Line> ifLines(next(it), lines.end());
                 int lines_to_skip = execute(ifLines, currentLevel + 1);
                 advance(it, lines_to_skip);
@@ -500,7 +514,7 @@ int execute(list<Line> lines, int currentLevel) {
         // while loop
         else if (contents.length() >= 5 && contents.rfind("while") == 0) {
             contents = contents.substr(contents.rfind("(") + 1, contents.find(")") - contents.rfind("(")-1);
-            if (evaluate_expr(contents) == "true") {
+            if (evaluate_expr(contents).getVal() == "true") {
                 list<Line> whileLines(next(it), lines.end());
                 execute(whileLines, currentLevel + 1);
                 continue;
@@ -516,7 +530,7 @@ int execute(list<Line> lines, int currentLevel) {
                  execute(assignment);
                  first_it = false;
             }
-            if (evaluate_expr(condition) == "true") {
+            if (evaluate_expr(condition).getVal() == "true") {
                 list<Line> forLines(next(it), lines.end());
                 execute(forLines, currentLevel + 1);
                 execute(iter_statement);
@@ -535,7 +549,7 @@ int execute(list<Line> lines, int currentLevel) {
 }
 
 int main(int argc, char *argv[]) {
-    string filepath = "FizzBuzz.alex";
+    string filepath = "fibonacci.alex";
     if (argc >= 2) {
         filepath = argv[1];
     }

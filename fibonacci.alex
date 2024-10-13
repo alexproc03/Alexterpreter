@@ -1,0 +1,13 @@
+let num_to_generate = 25
+
+let a = 0
+let b = 1
+
+for (let i = 0; i < num_to_generate; let i = i + 1)
+    if (num_to_generate == 1)
+        print a
+    if (num_to_generate > 1)
+        println(a)
+        let next = a + b
+        let a = b
+        let b = next
