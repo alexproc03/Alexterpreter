@@ -1,0 +1,8 @@
+let character = "[]"
+let size = 10
+
+while (size > 0) 
+    for (let i = 0; i < size; let i = i + 1)
+        print(character)
+    println()
+    let size = size - 1

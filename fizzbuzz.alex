@@ -1,0 +1,11 @@
+let fizz = "Fizz"
+let buzz = "Buzz"
+
+for (let x = 1; x <= 100; let x = x + 1)
+    if (x % 3 == 0)
+        print(fizz)
+    if (x % 5 == 0)
+        print(buzz)
+    if (x % 3 != 0 && x % 5 != 0)
+        print(x)
+    println()
